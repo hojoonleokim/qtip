@@ -15,3 +15,6 @@ fast-hadamard-transform/dist/
 report*.nsys-rep
 report*.sqlite
 profile_results/
+QTIP_HF/
+QTIP_CKPT/
+QTIP_LOG/

@@ -4,7 +4,7 @@
 CKPT="QTIP_CKPT"  # Checkpoint directory
 HF="QTIP_HF"    # Hugging Face directory
 LOG="QTIP_LOG"   # Log directory
-HESS="../../Llama-3.1-8B-Hessians"  # Hessian directory
+HESS="../Llama-3.1-8B-Hessians"  # Hessian directory
 
 # Create necessary directories
 mkdir -p $CKPT $LOG $HF
@@ -21,21 +21,21 @@ DECODE_MODES=("quantlut_sym" "1mad" "3inst" "lut")
 
 # Function to run training and convert to HF
 run_experiment() {
-    local bits=$1
-    local decode_mode=$2
+    bits=$1
+    decode_mode=$2
     
     echo "Starting experiment with ${bits} bits and decode_mode: ${decode_mode}"
     
     # Set V and L based on decode_mode
     if [ "$decode_mode" = "quantlut_sym" ]; then
         V=2
-        local effective_L=9
+        tlut_bits=9
     else
         V=1
         if [ "$decode_mode" = "lut" ]; then
-            local effective_L=$L
+            tlut_bits=$L
         else
-            local effective_L=1
+            tlut_bits=0  # for 3inst and 1mad
         fi
     fi
     
@@ -43,6 +43,10 @@ run_experiment() {
     OUT_DIR="${CKPT}/${bits}bit_${decode_mode}"
     LOG_FILE="${LOG}/${bits}bit_${decode_mode}.log"
     HF_DIR="${HF}/${bits}bit_${decode_mode}"
+    
+    # Create experiment-specific directories
+    mkdir -p $OUT_DIR
+    mkdir -p $HF_DIR
     
     echo "Step 1: Quantization and Training"
     python -m quantize_llama.quantize_finetune_llama \
@@ -58,7 +62,7 @@ run_experiment() {
         --K $bits \
         --V $V \
         --decode_mode $decode_mode \
-        --tlut_bits $effective_L \
+        --tlut_bits $tlut_bits \
         >> $LOG_FILE 2>&1
     
     echo "Step 2: Converting to HuggingFace format"
@@ -67,20 +71,20 @@ run_experiment() {
         --hf_output_path $HF_DIR \
         >> $LOG_FILE 2>&1
     
-    echo "Step 3: Finetuning the model"
-    python -m quantize_llama.finetune_e2e_llama \
-        --base_model $BASE_MODEL \
-        --hf_path $HF_DIR \
-        --devset_size 640 \
-        --ft_valid_size 128 \
-        --ft_epochs 4 \
-        --ft_update_freq 4 \
-        --ft_bs 2 \
-        --ctx_size 4096 \
-        --ft_train_lut \
-        --hf_output_path $HF_DIR \
-        >> $LOG_FILE 2>&1
-    
+    # echo "Step 3: Finetuning the model"
+    # python -m quantize_llama.finetune_e2e_llama \
+    #     --base_model $BASE_MODEL \
+    #     --hf_path $HF_DIR \
+    #     --devset_size 640 \
+    #     --ft_valid_size 128 \
+    #     --ft_epochs 4 \
+    #     --ft_update_freq 4 \
+    #     --ft_bs 2 \
+    #     --ctx_size 4096 \
+    #     --ft_train_lut \
+    #     --hf_output_path $HF_DIR \
+    #     >> $LOG_FILE 2>&1
+    rm -rf $OUT_DIR
     echo "Completed experiment for ${bits} bits and decode_mode: ${decode_mode}"
 }
 
