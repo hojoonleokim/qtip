@@ -428,46 +428,61 @@ class BitshiftLinear(nn.Module):
         n, m = len(SU), len(SV)
         x = input.view(-1, n).to(torch.float32)
         x = x * SU
-
+        #print("#######1 forward#######")
         if mode == 'train-fixW':
+            #print("2 train-fixW")
             x = (x.to(self.internal_dtype) @ self.hatW.T).float()
         else:
             bs = x.shape[0]
-
+            torch.cuda.nvtx.range_push("Linear")
             if rcp == 1:
+                #print("3 rcp == 1")
                 x = matmul_hadUt_cuda(x.reshape(-1, n // tp_rank), had_left,
                                       K_left).reshape(x.shape) / self.scale
             else:
+                #######HERE#####
+                torch.cuda.nvtx.range_push("matmul_hadUt_cuda")
                 x = matmul_hadUt_cuda(x, had_left, K_left) / self.scale
-
+                torch.cuda.nvtx.range_pop()
             if bs == 1 and self.has_kernel:
+                #print("4 bs == 1")
                 wrapper = getattr(
                     torch.ops.quip_lib,
                     f"decompress_matvec_qtip_{m}_1_{x.numel()}_{self.cb.K}")
 
                 x = wrapper(trellis, x, self.cb.tlut)
-
             else:
+                #######HERE#####
+                #print("4.1 bs != 1")
                 if mode == 'train-recons':
+                    #print("5 train-recons")
                     self.cb.recons_lut()
 
                 if self.has_kernel:
+                    #######HERE#####
+                    #print("6 has_kernel")
+                    torch.cuda.nvtx.range_push("BitshiftLinearKernelAG")
                     x = BitshiftLinearKernelAG.apply(
                         x, trellis, m, n, self.cb.L, self.cb.tlut_bits, self.cb.K,
                         self.V, self.cb.lut).float()
+                    torch.cuda.nvtx.range_pop()
                 else:
                     if mode == 'eval':
+                        #print("7 eval")
                         trellis = self.cb.unpack_trellis(
                             trellis, self.td_x * self.td_y)
                     hatW = self.get_hatW(trellis, m, n)
                     x = (x.to(hatW.dtype) @ hatW.T).float()
 
             if rcp == 2:
+                #print("8 rcp == 2")
                 x = matmul_hadU_cuda(x.reshape(-1, m // tp_rank), had_right,
                                      K_right).reshape(x.shape)
             else:
+                torch.cuda.nvtx.range_push("matmul_hadU_cuda")
                 x = matmul_hadU_cuda(x, had_right, K_right)
-
+                torch.cuda.nvtx.range_pop()
+            torch.cuda.nvtx.range_pop()
         x = x.to(SV.device) * (SV * self.scale)
         return x.view(*input.shape[:-1], m).to(input.dtype)
 

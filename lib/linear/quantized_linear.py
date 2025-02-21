@@ -92,6 +92,8 @@ class QuantizedLinear(nn.Module):
 
     def no_ckpt_forward(self, input):
         if not self.built_codebook_class:
+            #print("1 built_codebook_class")
+            torch.cuda.nvtx.range_push("built codebook class")
             self.codebook_class = bitshift.BitshiftLinear(
                 self.td_x,
                 self.td_y,
@@ -109,8 +111,11 @@ class QuantizedLinear(nn.Module):
             self.rcp = rcp
 
             if self.mode == 'eval':
+                #######HERE########
+                #print("1.2 eval")
                 pass
             elif self.mode == 'train-recons':
+                #print("1.3 train-recons")
                 if not self.has_kernel:
                     self.packed_trellis = self.trellis.cpu()
                     unpacked_trellis = self.codebook_class.cb.unpack_trellis(
@@ -118,6 +123,7 @@ class QuantizedLinear(nn.Module):
                     self.trellis = unpacked_trellis
                     clean()
             elif self.mode == 'train-fixW':
+                #print("1.4 train-fixW")
                 self.codebook_class.cache_hatW(self.trellis, self.had_left,
                                                self.had_right, self.K_left,
                                                self.K_right, len(self.SV),
@@ -131,10 +137,11 @@ class QuantizedLinear(nn.Module):
                 self.K_left = None
                 self.K_right = None
             else:
+                #print("1.5 else")
                 raise Exception
 
             self.built_codebook_class = True
-
+            torch.cuda.nvtx.range_pop()
         result = self.codebook_class(input,
                                      self.trellis,
                                      self.SU,

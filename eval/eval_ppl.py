@@ -33,8 +33,9 @@ def main(args):
         for module in model.modules():
             if isinstance(module, QuantizedLinear):
                 module.mode = 'train-fixW'
-
+    n = 0
     for dataset in datasets:
+        print("dataset",len(dataset))
         input_tok = gptq_data_utils.get_test_tokens(dataset,
                                                     seed=args.seed,
                                                     seqlen=args.seqlen,
@@ -46,19 +47,28 @@ def main(args):
         loss_fct = torch.nn.CrossEntropyLoss().cuda()
         acc_loss = 0.0
         progress = tqdm(range(nsamples))
+        print(nsamples) ######70 for wikitext2, 256 for c4
         for ii in progress:
+            if(n==10):
+                torch.cuda.cudart().cudaProfilerStart()
             input = input_tok[ii, :].cuda().view(1, -1)
+            torch.cuda.nvtx.range_push("FWD")
             output = model(input,
                            use_cache=False,
                            output_hidden_states=False,
                            output_attentions=False)[0]
+            torch.cuda.nvtx.range_pop()
             shift_logits = output[:, :-1, :].contiguous()
             shift_labels = input[:, 1:]
             loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)),
                             shift_labels.view(-1))
             acc_loss += loss.item()
             progress.set_description(f"avg_loss = {acc_loss/(ii+1)}")
-
+            n += 1
+            if(n==13):
+                torch.cuda.cudart().cudaProfilerStop()
+            #if(n==15):
+                #exit()
         avg_loss = acc_loss / nsamples
 
         ppl = torch.exp(torch.tensor(avg_loss)).item()
