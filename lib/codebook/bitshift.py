@@ -467,12 +467,14 @@ class BitshiftLinear(nn.Module):
                         self.V, self.cb.lut).float()
                     torch.cuda.nvtx.range_pop()
                 else:
+                    torch.cuda.nvtx.range_push("NoKernelAG")
                     if mode == 'eval':
                         #print("7 eval")
                         trellis = self.cb.unpack_trellis(
                             trellis, self.td_x * self.td_y)
                     hatW = self.get_hatW(trellis, m, n)
                     x = (x.to(hatW.dtype) @ hatW.T).float()
+                    torch.cuda.nvtx.range_pop()
 
             if rcp == 2:
                 #print("8 rcp == 2")

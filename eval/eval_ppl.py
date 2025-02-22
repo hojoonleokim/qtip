@@ -65,10 +65,10 @@ def main(args):
             acc_loss += loss.item()
             progress.set_description(f"avg_loss = {acc_loss/(ii+1)}")
             n += 1
-            if(n==13):
+            if(n==15):
                 torch.cuda.cudart().cudaProfilerStop()
-            #if(n==15):
-                #exit()
+                torch.cuda.synchronize()
+                exit()
         avg_loss = acc_loss / nsamples
 
         ppl = torch.exp(torch.tensor(avg_loss)).item()

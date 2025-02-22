@@ -11,12 +11,13 @@ mkdir -p "$RESULT_DIR"
 
 # FIXME
 MODEL="Llama-3.1-8b-Instruct"
-BIT="4"
+BIT="2"
 DECODE="quantlut_sym"
 
 RESULT_FILE="$MODEL.$BIT.$DECODE.nsys-rep"
 
 RUN_CMD="python -m eval.eval_ppl  --hf_path relaxml/Llama-3.1-8b-Instruct-QTIP-4Bit"
+RUN_CMD="python -m eval.eval_ppl  --hf_path QTIP_HF/2bit_quantlut_sym/"
 
 nsys profile --capture-range=cudaProfilerApi \
   --output="$RESULT_DIR/$RESULT_FILE" \
