@@ -470,10 +470,16 @@ class BitshiftLinear(nn.Module):
                     torch.cuda.nvtx.range_push("NoKernelAG")
                     if mode == 'eval':
                         #print("7 eval")
+                        torch.cuda.nvtx.range_push("Unpack")
                         trellis = self.cb.unpack_trellis(
                             trellis, self.td_x * self.td_y)
+                        torch.cuda.nvtx.range_pop()
+                    torch.cuda.nvtx.range_push("getW")
                     hatW = self.get_hatW(trellis, m, n)
+                    torch.cuda.nvtx.range_pop()
+                    torch.cuda.nvtx.range_push("Matmul")
                     x = (x.to(hatW.dtype) @ hatW.T).float()
+                    torch.cuda.nvtx.range_pop()
                     torch.cuda.nvtx.range_pop()
 
             if rcp == 2:
@@ -500,9 +506,10 @@ class BitshiftLinearKernelAG(torch.autograd.Function):
         ctx.V = V
         ctx.m = m
         ctx.n = n
-        
+        torch.cuda.nvtx.range_push("decode_compressed")
         hatW = decode_compressed(L, tlut_bits, K, int(math.log2(V)),
                                  m, n, trellis.view(-1), lut.T)
+        torch.cuda.nvtx.range_pop()
         return input.to(hatW.dtype) @ hatW.T
 
     @staticmethod
