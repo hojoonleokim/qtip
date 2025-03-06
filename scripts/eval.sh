@@ -3,7 +3,7 @@
 # FIXME
 MODEL="Llama-3.1-8b-Instruct"
 # Array of bits to evaluate
-BITS=("3" "4")
+BITS=("4")
 
 # Array of decode modes
 DECODE_MODES=("quantlut_sym" "1mad" "3inst" "lut")

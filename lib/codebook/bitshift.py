@@ -477,6 +477,9 @@ class BitshiftLinear(nn.Module):
                     torch.cuda.nvtx.range_push("getW")
                     hatW = self.get_hatW(trellis, m, n)
                     torch.cuda.nvtx.range_pop()
+                    print("#############")
+                    print("X W shape:", x.shape, hatW.shape)
+                    print("#############")                    
                     torch.cuda.nvtx.range_push("Matmul")
                     x = (x.to(hatW.dtype) @ hatW.T).float()
                     torch.cuda.nvtx.range_pop()
@@ -510,7 +513,13 @@ class BitshiftLinearKernelAG(torch.autograd.Function):
         hatW = decode_compressed(L, tlut_bits, K, int(math.log2(V)),
                                  m, n, trellis.view(-1), lut.T)
         torch.cuda.nvtx.range_pop()
-        return input.to(hatW.dtype) @ hatW.T
+        print("#############")
+        print("X W shape:", input.shape, hatW.shape)
+        print("#############")             
+        torch.cuda.nvtx.range_push("matmul")
+        result = input.to(hatW.dtype) @ hatW.T
+        torch.cuda.nvtx.range_pop()
+        return result
 
     @staticmethod
     def backward(ctx, grad_output):
